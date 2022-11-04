@@ -121,9 +121,8 @@ static int rkmpp_copy_buffer(struct rkmpp_context *ctx,
 	ENTER();
 
 	if (buffer->length > 3) {
-		LOGE("wrong buffer planes SAD : %d\n", buffer->length);
-		buffer->length = 1;
-		//return -1;
+		LOGE("wrong buffer planes: %d\n", buffer->length);
+		return -1;
 	}
 
 	/* Nothing to do for mmap buffer */
@@ -233,10 +232,9 @@ int rkmpp_to_v4l2_buffer(struct rkmpp_context *ctx,
 	ENTER();
 
 	if (buffer->length != rkmpp_buffer->length) {
-		LOGE("wrong buffer %p planes: %d(expected: %p %d)\n",
-		     buffer, buffer->length, rkmpp_buffer, rkmpp_buffer->length);
-		//return -1;
-	   buffer->length = rkmpp_buffer->length;
+		LOGE("wrong buffer planes: %d(expected: %d)\n",
+		     buffer->length, rkmpp_buffer->length);
+		return -1;
 	}
 
 	for (i = 0; i < buffer->length; i++) {

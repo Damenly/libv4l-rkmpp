@@ -264,15 +264,13 @@ int rkmpp_try_fmt(struct rkmpp_context *ctx, struct v4l2_format *f)
 		     compressed ? "compressed" : "raw");
 		RETURN_ERR(EINVAL, -1);
 	}
-	LOGE("find %s format %s\n",
-	     compressed ? "compressed" : "raw", fmt->name);
 
 	if (compressed) {
 		if (pix_fmt_mp->plane_fmt[0].sizeimage == 0) {
 			LOGE("sizeimage of compressed format must be given\n");
 			RETURN_ERR(EINVAL, -1);
 		}
-		LOGE("sizeimage: %d\n", pix_fmt_mp->plane_fmt[0].sizeimage);
+
 		pix_fmt_mp->num_planes = fmt->num_planes;
 		pix_fmt_mp->plane_fmt[0].bytesperline = 0;
 	} else {
@@ -296,7 +294,6 @@ int rkmpp_try_fmt(struct rkmpp_context *ctx, struct v4l2_format *f)
 		calculate_plane_sizes(fmt, pix_fmt_mp);
 	}
 
-	LOGE("planes %d\n", pix_fmt_mp->num_planes);
 	LEAVE();
 	return 0;
 }
@@ -395,6 +392,8 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
 		goto err;
 	}
 
+	LOGV(1, "sizeimage: %d, count: %d\n", sizeimage, reqbufs->count);
+
 	pthread_mutex_lock(&queue->queue_mutex);
 	TAILQ_INIT(&queue->avail_buffers);
 	TAILQ_INIT(&queue->pending_buffers);
@@ -411,19 +410,8 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
 	if (!queue->buffers)
 		goto err;
 
-	LOGV(1, "sizeimage: %d, count: %d planes: %d num_buffers:%d\n", sizeimage,
-	     reqbufs->count, queue->format.num_planes, queue->num_buffers);
-
 	/* Allocate all buffers from main buffer pool */
 	for (i = 0; i < queue->num_buffers; i++) {
-		/*
-		buffer = malloc(sizeof(MppBuffer));
-		if (buffer == NULL) {
-			LOGE("unable to alloc buffer\n");
-			goto err;
-		}
-		*/
-
 		ret = mpp_buffer_get(queue->internal_group,
 				     &buffer, sizeimage);
 		if (ret != MPP_OK) {
@@ -440,10 +428,8 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
 		queue->buffers[i].planes[0].length = sizeimage;
 		rkmpp_buffer_set_locked(&queue->buffers[i]);
 
-		LOGE("create buffer(%p %s %d index:%d len: %d size: %d), fd: %d rkbuffer %p\n",
-		     buffer, buffer == NULL ? "NULL" : "nonNULL", i,
-		     queue->buffers[i].index, queue->buffers[i].length,
-		     queue->buffers[i].size, queue->buffers[i].fd, &queue->buffers[i]);
+		LOGV(1, "create buffer(%d), fd: %d\n",
+		     i, queue->buffers[i].fd);
 	}
 
 	if (!queue->external_group)
@@ -472,10 +458,8 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
 		queue->buffers[i].rkmpp_buf = buffer;
 		queue->buffers[i].fd = mpp_buffer_get_fd(buffer);
 
-		LOGE("create external buffer(%p %s %d index:%d len: %d size: %d), fd: %d rkbuffer %p\n",
-		     buffer, buffer == NULL ? "NULL" : "nonNULL", i,
-		     queue->buffers[i].index, queue->buffers[i].length,
-		     queue->buffers[i].size, queue->buffers[i].fd, &queue->buffers[i]);
+		LOGV(1, "create external buffer(%d), fd: %d\n",
+		     i, queue->buffers[i].fd);
 	}
 
 out:

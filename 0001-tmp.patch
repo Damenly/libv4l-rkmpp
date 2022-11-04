@@ -1,0 +1,187 @@
+From b6a7551e3e17a625b252a2396cecd7588d54036d Mon Sep 17 00:00:00 2001
+From: Su Yue <glass@fydeos.io>
+Date: Mon, 31 Oct 2022 11:38:42 +0800
+Subject: [PATCH] tmp
+
+Signed-off-by: Su Yue <glass@fydeos.io>
+---
+ include/libv4l-rkmpp.h |  7 ++++---
+ src/libv4l-rkmpp-dec.c | 21 ++++++++++++++++++++-
+ src/libv4l-rkmpp.c     | 19 ++++++++++++-------
+ src/utils.c            | 12 +++++++-----
+ 4 files changed, 43 insertions(+), 16 deletions(-)
+
+diff --git a/include/libv4l-rkmpp.h b/include/libv4l-rkmpp.h
+index ecd82df38337..35e8831e56ce 100644
+--- a/include/libv4l-rkmpp.h
++++ b/include/libv4l-rkmpp.h
+@@ -27,6 +27,7 @@
+ #include <inttypes.h>
+ #include <sys/queue.h>
+ #include <sys/syscall.h>
++#include <syslog.h>
+ 
+ #include <rockchip/rk_mpi.h>
+ 
+@@ -42,14 +43,14 @@ extern int rkmpp_log_level;
+ #define LOG(fmt, ...) ({ \
+ 	struct timeval tv; \
+ 	gettimeofday(&tv, NULL); \
+-	printf("[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
++	syslog(LOG_KERN, "[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
+ 	       tv.tv_sec % 1000, tv.tv_usec / 1000, gettid(), \
+ 	       __func__, __LINE__, ##__VA_ARGS__); \
+-	fflush(stdout); \
++	fflush(stderr); \
+ 	})
+ 
+ #define LOGV(level, fmt, ...) \
+-	({ if (rkmpp_log_level >= level) LOG(fmt, ##__VA_ARGS__); })
++	({ if (rkmpp_log_level >= level || true) LOG(fmt, ##__VA_ARGS__); })
+ 
+ #define LOGE(fmt, ...) LOG("ERR: " fmt, ##__VA_ARGS__)
+ 
+diff --git a/src/libv4l-rkmpp-dec.c b/src/libv4l-rkmpp-dec.c
+index ea173506a9fd..2e0fb546bfc3 100644
+--- a/src/libv4l-rkmpp-dec.c
++++ b/src/libv4l-rkmpp-dec.c
+@@ -73,6 +73,23 @@ static const struct rkmpp_fmt rkmpp_dec_fmts[] = {
+ 			.step_height = RKMPP_SB_DIM,
+ 		},
+ 	},
++	{
++		.name = "JPEG",
++		.fourcc = V4L2_PIX_FMT_JPEG,
++		.num_planes = 1,
++		.type = MPP_VIDEO_CodingMJPEG,
++//		.format = MPP_FMT_YUV420SP,
++//		.depth = { 12 },
++		.format = MPP_FMT_BUTT,
++		.frmsize = {
++			.min_width = 48,
++			.max_width = 3840,
++			.step_width = RKMPP_MB_DIM,
++			.min_height = 48,
++			.max_height = 2160,
++			.step_height = RKMPP_MB_DIM,
++		},
++	},
+ };
+ 
+ /* Feed all available packets to mpp */
+@@ -104,8 +121,10 @@ static void rkmpp_put_packets(struct rkmpp_dec_context *dec)
+ 		ret = ctx->mpi->decode_put_packet(ctx->mpp, packet);
+ 		mpp_packet_deinit(&packet);
+ 
+-		if (ret != MPP_OK)
++		if (ret != MPP_OK) {
++			LOGE("put_packet not OK SAD\n");
+ 			break;
++		}
+ 
+ 		TAILQ_REMOVE(&ctx->output.pending_buffers,
+ 			     rkmpp_buffer, entry);
+diff --git a/src/libv4l-rkmpp.c b/src/libv4l-rkmpp.c
+index 77de1b1ed526..f02ac1937ec3 100644
+--- a/src/libv4l-rkmpp.c
++++ b/src/libv4l-rkmpp.c
+@@ -265,13 +265,15 @@ int rkmpp_try_fmt(struct rkmpp_context *ctx, struct v4l2_format *f)
+ 		     compressed ? "compressed" : "raw");
+ 		RETURN_ERR(EINVAL, -1);
+ 	}
++	LOGE("find %s format %s\n",
++	     compressed ? "compressed" : "raw", fmt->name);
+ 
+ 	if (compressed) {
+ 		if (pix_fmt_mp->plane_fmt[0].sizeimage == 0) {
+ 			LOGE("sizeimage of compressed format must be given\n");
+ 			RETURN_ERR(EINVAL, -1);
+ 		}
+-
++		LOGE("sizeimage: %d\n", pix_fmt_mp->plane_fmt[0].sizeimage);
+ 		pix_fmt_mp->num_planes = fmt->num_planes;
+ 		pix_fmt_mp->plane_fmt[0].bytesperline = 0;
+ 	} else {
+@@ -295,6 +297,7 @@ int rkmpp_try_fmt(struct rkmpp_context *ctx, struct v4l2_format *f)
+ 		calculate_plane_sizes(fmt, pix_fmt_mp);
+ 	}
+ 
++	LOGE("planes %d\n", pix_fmt_mp->num_planes);
+ 	LEAVE();
+ 	return 0;
+ }
+@@ -393,8 +396,6 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
+ 		goto err;
+ 	}
+ 
+-	LOGV(1, "sizeimage: %d, count: %d\n", sizeimage, reqbufs->count);
+-
+ 	pthread_mutex_lock(&queue->queue_mutex);
+ 	TAILQ_INIT(&queue->avail_buffers);
+ 	TAILQ_INIT(&queue->pending_buffers);
+@@ -411,6 +412,9 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
+ 	if (!queue->buffers)
+ 		goto err;
+ 
++	LOGV(1, "sizeimage: %d, count: %d planes: %d num_buffers:%d\n", sizeimage,
++	     reqbufs->count, queue->format.num_planes, queue->num_buffers);
++
+ 	/* Allocate all buffers from main buffer pool */
+ 	for (i = 0; i < queue->num_buffers; i++) {
+ 		ret = mpp_buffer_get(queue->internal_group,
+@@ -429,8 +433,9 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
+ 		queue->buffers[i].planes[0].length = sizeimage;
+ 		rkmpp_buffer_set_locked(&queue->buffers[i]);
+ 
+-		LOGV(1, "create buffer(%d), fd: %d\n",
+-		     i, queue->buffers[i].fd);
++		LOGV(1, "create buffer(%p %d index:%d len: %d size: %d), fd: %d rkbuffer %p\n",
++		     i, buffer, queue->buffers[i].index, queue->buffers[i].length,
++		     queue->buffers[i].size, queue->buffers[i].fd, &queue->buffers[i]);
+ 	}
+ 
+ 	if (!queue->external_group)
+@@ -459,8 +464,8 @@ int rkmpp_reqbufs(struct rkmpp_context *ctx,
+ 		queue->buffers[i].rkmpp_buf = buffer;
+ 		queue->buffers[i].fd = mpp_buffer_get_fd(buffer);
+ 
+-		LOGV(1, "create external buffer(%d), fd: %d\n",
+-		     i, queue->buffers[i].fd);
++		LOGV(1, "create external buffer(%p %d len: %d), fd: %d\n",
++		     buffer, i, queue->buffers[i].length, queue->buffers[i].fd);
+ 	}
+ 
+ out:
+diff --git a/src/utils.c b/src/utils.c
+index 87b9a2a65bbf..d61b3c9ceb84 100644
+--- a/src/utils.c
++++ b/src/utils.c
+@@ -117,8 +117,9 @@ static int rkmpp_copy_buffer(struct rkmpp_context *ctx,
+ 	ENTER();
+ 
+ 	if (buffer->length > 3) {
+-		LOGE("wrong buffer planes: %d\n", buffer->length);
+-		return -1;
++		LOGE("wrong buffer planes SAD : %d\n", buffer->length);
++		buffer->length = 1;
++		//return -1;
+ 	}
+ 
+ 	/* Nothing to do for mmap buffer */
+@@ -228,9 +229,10 @@ int rkmpp_to_v4l2_buffer(struct rkmpp_context *ctx,
+ 	ENTER();
+ 
+ 	if (buffer->length != rkmpp_buffer->length) {
+-		LOGE("wrong buffer planes: %d(expected: %d)\n",
+-		     buffer->length, rkmpp_buffer->length);
+-		return -1;
++		LOGE("wrong buffer %p planes: %d(expected: %p %d)\n",
++		     buffer, buffer->length, rkmpp_buffer, rkmpp_buffer->length);
++		//return -1;
++	   buffer->length = rkmpp_buffer->length;
+ 	}
+ 
+ 	for (i = 0; i < buffer->length; i++) {
+-- 
+2.38.1
+

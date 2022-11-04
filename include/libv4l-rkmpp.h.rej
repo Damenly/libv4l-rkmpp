@@ -1,0 +1,20 @@
+--- include/libv4l-rkmpp.h
++++ include/libv4l-rkmpp.h
+@@ -43,14 +44,14 @@ extern int rkmpp_log_level;
+ #define LOG(fmt, ...) ({ \
+ 	struct timeval tv; \
+ 	gettimeofday(&tv, NULL); \
+-	printf("[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
++	syslog(LOG_KERN, "[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
+ 	       tv.tv_sec % 1000, tv.tv_usec / 1000, gettid(), \
+ 	       __func__, __LINE__, ##__VA_ARGS__); \
+-	fflush(stdout); \
++	fflush(stderr); \
+ 	})
+ 
+ #define LOGV(level, fmt, ...) \
+-	({ if (rkmpp_log_level >= level) LOG(fmt, ##__VA_ARGS__); })
++	({ if (rkmpp_log_level >= level || true) LOG(fmt, ##__VA_ARGS__); })
+ 
+ #define LOGE(fmt, ...) LOG("ERR: " fmt, ##__VA_ARGS__)
+ 

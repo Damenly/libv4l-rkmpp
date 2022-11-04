@@ -27,7 +27,6 @@
 #include <inttypes.h>
 #include <sys/queue.h>
 #include <sys/syscall.h>
-#include <syslog.h>
 
 #include <rockchip/rk_mpi.h>
 
@@ -43,14 +42,14 @@ extern int rkmpp_log_level;
 #define LOG(fmt, ...) do { \
 	struct timeval tv; \
 	gettimeofday(&tv, NULL); \
-	syslog(LOG_KERN, "[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
+	printf("[%03ld.%03ld] [RKMPP] [%ld] %s(%d): " fmt, \
 	       tv.tv_sec % 1000, tv.tv_usec / 1000, gettid(), \
 	       __func__, __LINE__, ##__VA_ARGS__); \
 	fflush(stdout); \
 	} while (0)
 
 #define LOGV(level, fmt, ...) \
-	do { if (rkmpp_log_level >= level && true) LOG(fmt, ##__VA_ARGS__); } while (0)
+	do { if (rkmpp_log_level >= level) LOG(fmt, ##__VA_ARGS__); } while (0)
 
 #define LOGE(fmt, ...) LOG("ERR: " fmt, ##__VA_ARGS__)
 

@@ -1,0 +1,17 @@
+--- src/libv4l-rkmpp-dec.c
++++ src/libv4l-rkmpp-dec.c
+@@ -73,6 +73,14 @@ static const struct rkmpp_fmt rkmpp_dec_
+                        .step_height = RKMPP_SB_DIM,
+                },
+        },
++  {
++    .name = "JPEG",
++    .fourcc = V4L2_PIX_FMT_JPEG,
++    .num_planes = 1,
++    .type = MPP_VIDEO_CodingMJPEG,
++    .format = MPP_FMT_YUV420SP,
++    .depth = { 12 },
++  },
+ };
+ 
+ /* Feed all available packets to mpp */

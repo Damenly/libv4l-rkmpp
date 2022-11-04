@@ -87,14 +87,6 @@ static struct rkmpp_fmt rkmpp_dec_fmts[] = {
 			.step_height = RKMPP_SB_DIM,
 		},
 	},
-	{
-		.name = "JPEG",
-		.fourcc = V4L2_PIX_FMT_JPEG,
-		.num_planes = 1,
-		.type = MPP_VIDEO_CodingMJPEG,
-		.format = MPP_FMT_YUV420SP,
-		.depth = { 12 },
-	},
 };
 
 /* Feed all available packets to mpp */
@@ -111,15 +103,6 @@ static void rkmpp_put_packets(struct rkmpp_dec_context *dec)
 	pthread_mutex_lock(&ctx->output.queue_mutex);
 	while (!TAILQ_EMPTY(&ctx->output.pending_buffers)) {
 		rkmpp_buffer = TAILQ_FIRST(&ctx->output.pending_buffers);
-		if (rkmpp_buffer == NULL) {
-			LOGE("WTF rk_mpp_buffer is null\n");
-			return;
-		} else if (rkmpp_buffer->rkmpp_buf == NULL) {
-			LOGE("WTF rk_mpp_buffer->rkmpp_buf is null\n");
-			return;
-		}
-
-		LOGE("OKKK rk_mpp_buffer %p is not null\n", rkmpp_buffer->rkmpp_buf);
 
 		mpp_packet_init(&packet,
 				mpp_buffer_get_ptr(rkmpp_buffer->rkmpp_buf),
@@ -133,15 +116,10 @@ static void rkmpp_put_packets(struct rkmpp_dec_context *dec)
 			mpp_packet_set_eos(packet);
 
 		ret = ctx->mpi->decode_put_packet(ctx->mpp, packet);
-
-		if (ret != MPP_OK) {
-			LOGE("put_packet not OK SAD %d\n", ret);
-			mpp_packet_deinit(&packet);
-			exit(1);
-			break;
-		}
-
 		mpp_packet_deinit(&packet);
+
+		if (ret != MPP_OK)
+			break;
 
 		TAILQ_REMOVE(&ctx->output.pending_buffers,
 			     rkmpp_buffer, entry);
